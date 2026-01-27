@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>中国电信账单差异对比工具</title>
+    <!-- 引入SheetJS库用于Excel解析和导出 -->
+    <script src="xlsx.full.min.js"></script>
+    <!-- 引入Bootstrap CSS用于美化界面 -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- 引入自定义样式 -->
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container mt-5">
+        <h1 class="text-center mb-5">中国电信账单差异对比工具</h1>
+        
+        <!-- 文件上传区域 -->
+        <div class="card mb-5">
+            <div class="card-header">
+                <h2 class="h4">步骤1：上传Excel文件</h2>
+            </div>
+            <div class="card-body">
+                <div class="mb-3">
+                    <label for="fileUpload" class="form-label">请选择包含账单信息的Excel文件</label>
+                    <input type="file" class="form-control" id="fileUpload" accept=".xlsx,.xls">
+                    <div class="form-text">文件必须包含：设备号码、账务周期、账单费用列</div>
+                </div>
+                <button id="parseButton" class="btn btn-primary" disabled>解析文件</button>
+            </div>
+        </div>
+        
+        <!-- 月份选择区域 -->
+        <div class="card mb-5" id="monthSelectionCard" style="display: none;">
+            <div class="card-header">
+                <h2 class="h4">步骤2：选择对比月份</h2>
+            </div>
+            <div class="card-body">
+                <div class="row mb-3">
+                    <div class="col-md-6">
+                        <label for="month1" class="form-label">第一个月份</label>
+                        <select class="form-select" id="month1">
+                            <option value="">请选择月份</option>
+                        </select>
+                    </div>
+                    <div class="col-md-6">
+                        <label for="month2" class="form-label">第二个月份</label>
+                        <select class="form-select" id="month2">
+                            <option value="">请选择月份</option>
+                        </select>
+                    </div>
+                </div>
+                <button id="compareButton" class="btn btn-success" disabled>开始对比分析</button>
+            </div>
+        </div>
+        
+        <!-- 结果展示区域 -->
+        <div class="card mb-5" id="resultCard" style="display: none;">
+            <div class="card-header">
+                <h2 class="h4">步骤3：查看分析结果</h2>
+            </div>
+            <div class="card-body">
+                <div id="summary" class="mb-4"></div>
+                <div class="table-responsive">
+                    <table class="table table-striped" id="resultTable">
+                        <thead>
+                            <tr>
+                                <th>设备号码</th>
+                                <th>账单费用_月份1</th>
+                                <th>账单费用_月份2</th>
+                                <th>差异金额</th>
+                                <th>差异百分比</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                        </tbody>
+                    </table>
+                </div>
+                <div class="mt-4">
+                    <button id="exportButton" class="btn btn-primary">导出分析结果</button>
+                    <button id="resetButton" class="btn btn-secondary ms-2">重新开始</button>
+                </div>
+            </div>
+        </div>
+        
+        <!-- 加载动画 -->
+        <div id="loading" class="d-flex justify-content-center align-items-center" style="display: none; height: 200px; visibility: hidden; opacity: 0;">
+            <div class="spinner-border" role="status">
+                <span class="visually-hidden">加载中...</span>
+            </div>
+            <span class="ms-2">处理中，请稍候...</span>
+        </div>
+    </div>
+    
+    <!-- 引入Bootstrap JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <!-- 引入自定义脚本 -->
+    <script src="script.js"></script>
+</body>
+</html>
