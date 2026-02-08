@@ -12,7 +12,8 @@ import pandas as pd
 import openpyxl
 import time
 
-app = Flask(__name__)
+# 模板从项目根目录读取，便于静态部署时根目录 index.html 与 Flask 共用同一文件
+app = Flask(__name__, template_folder=Path(__file__).resolve().parent)
 # 当前项目目录即工作目录
 BASE_DIR = Path(__file__).resolve().parent
 EXCEL_EXTENSIONS = ('.xlsx', '.xls')
