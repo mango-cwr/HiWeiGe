@@ -3,6 +3,7 @@
 套餐详情分析 Web 服务：上传套餐文件（Excel）并进行分析。
 规则：忽略表格前 10 行与后 7 行；按「套餐」归类——套餐为 A 列中字号 16、加粗的单元格。
 """
+import os
 import re
 import xml.etree.ElementTree as ET
 from pathlib import Path
@@ -16,7 +17,15 @@ import time
 app = Flask(__name__, template_folder=Path(__file__).resolve().parent)
 # 当前项目目录即工作目录
 BASE_DIR = Path(__file__).resolve().parent
+# Vercel 等无状态环境仅可写 /tmp，上传在同一请求内完成读写后删除
+UPLOAD_ROOT = Path('/tmp') if os.environ.get('VERCEL') else BASE_DIR
 EXCEL_EXTENSIONS = ('.xlsx', '.xls')
+
+
+def _resolve_path(path):
+    """支持相对路径（相对 BASE_DIR）或绝对路径（如 /tmp/...）。"""
+    p = Path(path)
+    return p if p.is_absolute() else BASE_DIR / p
 
 
 def _cell_value(cell):
@@ -204,11 +213,11 @@ def read_excel_grouped_by_package(path, sheet_name=None):
     - 套餐名：A 列，16 号字加粗。套餐从该行开始，到 A 列内容为「合计」的那一行结束（含该行）。
     - 其他套餐：A 列为 14 号字体的单元格（产品名/接入号形式），且不在任一「套餐名→合计」块内的行，归为「其他套餐」。
     """
-    path = BASE_DIR / path
+    path = _resolve_path(path)
     if not path.is_file() or path.suffix.lower() != '.xlsx':
         return None
     try:
-        wb = openpyxl.load_workbook(path, data_only=True, read_only=False)
+        wb = openpyxl.load_workbook(str(path), data_only=True, read_only=False)
         sheet_names = wb.sheetnames
         if sheet_name is not None:
             if sheet_name not in sheet_names:
@@ -322,11 +331,11 @@ def read_excel_grouped_by_package(path, sheet_name=None):
 
 def read_excel_sheets(path):
     """读取套餐文件所有工作表，返回各表的数据与基本信息（应用前10行/后7行忽略，按套餐归类）。"""
-    path = BASE_DIR / path
+    path = _resolve_path(path)
     if not path.is_file() or path.suffix.lower() not in EXCEL_EXTENSIONS:
         return None
     if path.suffix.lower() == '.xlsx':
-        result = read_excel_grouped_by_package(path, sheet_name=None)
+        result = read_excel_grouped_by_package(str(path), sheet_name=None)
         if result is None:
             return None
         if 'error' in result:
@@ -390,7 +399,7 @@ def api_upload():
     if suffix not in EXCEL_EXTENSIONS:
         return jsonify({'error': '仅支持套餐文件（.xls, .xlsx）'}), 400
 
-    uploads_dir = BASE_DIR / 'uploads'
+    uploads_dir = UPLOAD_ROOT / 'uploads'
     try:
         uploads_dir.mkdir(exist_ok=True)
     except Exception:
@@ -399,18 +408,18 @@ def api_upload():
 
     ts = int(time.time() * 1000)
     stored_rel_path = Path('uploads') / f'upload_{ts}{suffix}'
-    stored_abs_path = BASE_DIR / stored_rel_path
+    stored_abs_path = UPLOAD_ROOT / stored_rel_path
 
     try:
         f.save(str(stored_abs_path))
 
-        read_result = read_excel_sheets(str(stored_rel_path))
+        read_result = read_excel_sheets(str(stored_abs_path))
         if read_result is None:
             return jsonify({'error': '文件读取失败'}), 400
         if 'error' in read_result:
             return jsonify({'error': read_result.get('error', '文件解析出错')}), 400
 
-        analyze_result = analyze_sheet_data(str(stored_rel_path))
+        analyze_result = analyze_sheet_data(str(stored_abs_path))
         if analyze_result is None:
             analyze_result = {}
 
@@ -547,13 +556,13 @@ def parse_monthly_bill_for_diff(path):
     返回：{ 'months': ['2024-07', '2024-08', ...], 'byMonth': { '2024-07': [ { 'number', 'fee' }, ... ], ... } }
     列名匹配：账单周期/周期/账期；号码/接入号/手机号；账单费用/费用/实际消费 等。
     """
-    path = BASE_DIR / path
+    path = _resolve_path(path)
     if not path.is_file():
         return None
     try:
         # 若文件头为 Excel 2003 XML，优先用专用解析器，避免 read_excel 报错
         try:
-            with open(path, 'rb') as f:
+            with open(str(path), 'rb') as f:
                 head = f.read(8)
         except Exception:
             head = b''
@@ -653,17 +662,17 @@ def api_upload_monthly_diff():
     suffix = Path(f.filename).suffix.lower()
     if suffix not in EXCEL_EXTENSIONS:
         return jsonify({'error': '仅支持 Excel 文件（.xls, .xlsx）'}), 400
-    uploads_dir = BASE_DIR / 'uploads'
+    uploads_dir = UPLOAD_ROOT / 'uploads'
     try:
         uploads_dir.mkdir(exist_ok=True)
     except Exception:
         return jsonify({'error': '无法创建上传目录'}), 500
     ts = int(time.time() * 1000)
     stored_rel_path = Path('uploads') / f'monthly_{ts}{suffix}'
-    stored_abs_path = BASE_DIR / stored_rel_path
+    stored_abs_path = UPLOAD_ROOT / stored_rel_path
     try:
         f.save(str(stored_abs_path))
-        result = parse_monthly_bill_for_diff(str(stored_rel_path))
+        result = parse_monthly_bill_for_diff(str(stored_abs_path))
         if result is None:
             return jsonify({'error': '文件读取失败'}), 400
         if 'error' in result:
@@ -683,7 +692,7 @@ def api_upload_monthly_diff():
 
 def analyze_sheet_data(path, sheet_name=None):
     """对指定工作表做简单分析：数值列统计、前几行预览。"""
-    path = BASE_DIR / path
+    path = _resolve_path(path)
     if not path.is_file():
         return None
     try:
