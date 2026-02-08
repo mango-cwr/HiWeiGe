@@ -1,0 +1,1002 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>套餐详情分析</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;600&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #f0f4f8;
+      --surface: #ffffff;
+      --border: #dde4eb;
+      --text: #1e293b;
+      --text-muted: #64748b;
+      --accent: #0ea5e9;
+      --accent-dim: #e0f2fe;
+      --green: #059669;
+      --orange: #d97706;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Noto Sans SC', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      line-height: 1.5;
+    }
+    .layout {
+      display: grid;
+      grid-template-columns: 280px 1fr;
+      min-height: 100vh;
+    }
+    .sidebar {
+      background: var(--surface);
+      border-right: 1px solid var(--border);
+      padding: 1.25rem;
+      overflow-y: auto;
+    }
+    .sidebar h2 {
+      font-size: 0.85rem;
+      font-weight: 600;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-bottom: 0.75rem;
+    }
+    .main {
+      padding: 1.5rem 2rem;
+      overflow-y: auto;
+    }
+    .main h1 {
+      font-size: 1.5rem;
+      font-weight: 600;
+      margin-bottom: 1rem;
+      color: var(--text);
+    }
+    .empty-state {
+      color: var(--text-muted);
+      padding: 3rem 2rem;
+      text-align: center;
+      border: 1px dashed var(--border);
+      border-radius: 12px;
+      margin-top: 1rem;
+    }
+    .tabs {
+      display: flex;
+      gap: 0.25rem;
+      margin-bottom: 1rem;
+      flex-wrap: wrap;
+    }
+    .tab {
+      padding: 0.5rem 1rem;
+      border-radius: 8px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      color: var(--text-muted);
+      cursor: pointer;
+      font-size: 0.9rem;
+    }
+    .tab:hover { color: var(--text); }
+    .tab.active {
+      background: var(--accent-dim);
+      border-color: var(--accent);
+      color: var(--accent);
+    }
+    .section {
+      margin-bottom: 2rem;
+    }
+    .package-block {
+      margin-bottom: 1rem;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      overflow: hidden;
+      background: var(--surface);
+    }
+    .package-block:first-of-type { margin-top: 0; }
+    .package-block.other-pkg-product {
+      margin-left: 0.75rem;
+      margin-bottom: 0.5rem;
+    }
+    .package-header {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.65rem 1rem;
+      cursor: pointer;
+      font-size: 1.05rem;
+      font-weight: 700;
+      color: var(--accent);
+      border-bottom: 1px solid var(--border);
+      user-select: none;
+      transition: background 0.15s;
+    }
+    .package-header:hover {
+      background: var(--accent-dim);
+    }
+    .package-header .chevron {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      transition: transform 0.2s;
+      flex-shrink: 0;
+    }
+    .package-header.collapsed .chevron {
+      transform: rotate(-90deg);
+    }
+    .package-header .count {
+      font-size: 0.8rem;
+      font-weight: 500;
+      color: var(--text-muted);
+      margin-left: auto;
+    }
+    .package-body {
+      display: block;
+    }
+    .package-body.collapsed {
+      display: none;
+    }
+    .package-body .table-wrap {
+      border-radius: 0;
+      border-left: none;
+      border-right: none;
+      border-bottom: none;
+    }
+    .rule-hint {
+      font-size: 0.8rem;
+      color: var(--text-muted);
+      margin-bottom: 1rem;
+    }
+    .toolbar {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      margin-bottom: 1rem;
+      flex-wrap: wrap;
+    }
+    .toolbar .btn {
+      padding: 0.4rem 0.85rem;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      background: var(--surface);
+      color: var(--text);
+      cursor: pointer;
+      font-size: 0.875rem;
+      font-family: inherit;
+    }
+    .toolbar .btn:hover {
+      background: var(--border);
+      color: var(--accent);
+    }
+    .package-header .amount {
+      font-family: 'IBM Plex Mono', 'Consolas', Monaco, monospace;
+      font-size: 1.1rem;
+      font-weight: 600;
+      color: var(--green);
+      margin-left: 0.5rem;
+    }
+    .sheet-total {
+      margin-top: 1rem;
+      padding: 0.75rem 1rem;
+      border-radius: 10px;
+      background: #ecfdf5;
+      border: 1px solid #a7f3d0;
+      font-size: 1.15rem;
+      font-weight: 600;
+      color: var(--green);
+      font-family: 'IBM Plex Mono', 'Consolas', Monaco, monospace;
+    }
+    .table-wrap {
+      overflow-x: auto;
+      border-radius: 10px;
+      border: 1px solid var(--border);
+      background: var(--surface);
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 1rem;
+    }
+    th, td {
+      padding: 0.5rem 0.75rem;
+      text-align: left;
+      border-bottom: 1px solid var(--border);
+    }
+    th {
+      font-weight: 600;
+      color: var(--text-muted);
+      background: #f1f5f9;
+      white-space: nowrap;
+    }
+    tr:last-child td { border-bottom: none; }
+    tr:hover td { background: #f0f9ff; }
+    .access-amount {
+      font-family: 'IBM Plex Mono', 'Consolas', Monaco, monospace;
+      font-size: 1.05rem;
+      font-weight: 600;
+      color: var(--green);
+      white-space: nowrap;
+    }
+    td .access-amount { margin-left: 0.5em; }
+    .btn-copy-access {
+      margin-left: 0.5rem;
+      padding: 0.2rem 0.5rem;
+      font-size: 0.75rem;
+      border-radius: 6px;
+      border: 1px solid var(--border);
+      background: var(--surface);
+      color: var(--text-muted);
+      cursor: pointer;
+      font-family: inherit;
+    }
+    .btn-copy-access:hover {
+      color: var(--accent);
+      border-color: var(--accent);
+    }
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+      gap: 0.75rem;
+    }
+    .stat-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 1rem;
+    }
+    .stat-card .label {
+      font-size: 0.8rem;
+      color: var(--text-muted);
+      margin-bottom: 0.35rem;
+    }
+    .stat-card .value {
+      font-family: 'IBM Plex Mono', 'Consolas', Monaco, monospace;
+      font-size: 1.15rem;
+      color: var(--accent);
+    }
+    .error-msg {
+      background: #fef2f2;
+      border: 1px solid #fecaca;
+      color: #dc2626;
+      padding: 1rem;
+      border-radius: 8px;
+      margin-top: 1rem;
+    }
+    .loading {
+      color: var(--text-muted);
+      padding: 2rem;
+    }
+    .monthly-diff-wrap { margin-top: 0.5rem; }
+    .monthly-diff-totals {
+      margin-bottom: 1rem;
+      padding: 0.75rem 1rem;
+      border-radius: 10px;
+      background: #ecfdf5;
+      border: 1px solid #a7f3d0;
+      font-size: 1.05rem;
+      font-weight: 600;
+      color: var(--green);
+      font-family: 'IBM Plex Mono', 'Consolas', Monaco, monospace;
+    }
+    .diff-up { color: var(--green); font-weight: 600; }
+    .diff-down { color: #dc2626; font-weight: 600; }
+  </style>
+</head>
+<body>
+  <div class="layout">
+    <aside class="sidebar">
+      <h2>套餐文件</h2>
+      <div class="toolbar">
+        <button type="button" class="btn" id="uploadBtn">上传套餐文件</button>
+        <input type="file" id="uploadInput" accept=".xls,.xlsx" style="display:none">
+      </div>
+      <h2 style="margin-top: 1.25rem;">月度账单差异对比</h2>
+      <div class="toolbar">
+        <button type="button" class="btn" id="uploadMonthlyDiffBtn">上传对比文件</button>
+        <input type="file" id="uploadMonthlyDiffInput" accept=".xls,.xlsx" style="display:none">
+      </div>
+    </aside>
+    <main class="main">
+      <h1 id="mainTitle">套餐详情分析</h1>
+      <div class="toolbar" id="searchBar" style="margin-bottom: 1rem;">
+        <input
+          id="searchInput"
+          type="text"
+          placeholder="搜索产品名称 / 接入号 / 费用项目…"
+          style="flex:1; min-width: 220px; padding: 0.45rem 0.6rem; border-radius: 8px; border: 1px solid var(--border); background: var(--surface); color: var(--text); font-size: 0.85rem;"
+        >
+        <button type="button" class="btn" id="searchBtn">搜索</button>
+        <button type="button" class="btn" id="clearSearchBtn">清空搜索</button>
+      </div>
+      <div id="content">
+        <div class="empty-state">请上传套餐文件进行分析</div>
+      </div>
+    </main>
+  </div>
+  <script>
+    const contentEl = document.getElementById('content');
+    const mainTitleEl = document.getElementById('mainTitle');
+    const searchBarEl = document.getElementById('searchBar');
+    const uploadBtn = document.getElementById('uploadBtn');
+    const uploadInput = document.getElementById('uploadInput');
+    const uploadMonthlyDiffBtn = document.getElementById('uploadMonthlyDiffBtn');
+    const uploadMonthlyDiffInput = document.getElementById('uploadMonthlyDiffInput');
+    const searchInput = document.getElementById('searchInput');
+    const searchBtn = document.getElementById('searchBtn');
+    const clearSearchBtn = document.getElementById('clearSearchBtn');
+
+    // 保留最近一次完整读取的结果，搜索时基于它做过滤
+    let lastReadData = null;
+    // 月度差異對比：上传解析结果 { months, byMonth }
+    let lastMonthlyDiffData = null;
+
+    function renderResult(readData, analyzeData, searchKeyword) {
+      let html = '';
+      const sheets = readData.sheets || [];
+      const sheetNames = readData.sheetNames || [];
+      const kw = (searchKeyword || '').trim();
+
+      if (kw) {
+        html += '<p class="rule-hint search-hint">搜索「' + escapeHtml(kw) + '」：仅显示该关键词所在「产品名称：接入号」及其金额；若某接入号下任意费用项、小计等含有该词，则该接入号会出现在下方。</p>';
+      }
+
+      if (sheetNames.length > 1) {
+        html += '<div class="tabs" id="sheetTabs">';
+        sheetNames.forEach((name, i) => {
+          html += `<button type="button" class="tab ${i === 0 ? 'active' : ''}" data-sheet="${escapeAttr(name)}" data-index="${i}">${escapeHtml(name)}</button>`;
+        });
+        html += '</div>';
+      }
+
+      // 表格：有 groups 则按套餐分组展示，否则整表展示
+      sheets.forEach((sheet, idx) => {
+        const show = idx === 0;
+        const hasGroups = sheet.groups && sheet.groups.length > 0;
+        html += '<div class="section sheet-panel" data-sheet-index="' + idx + '" ' + (show ? '' : 'style="display:none"') + '>';
+
+        if (hasGroups) {
+          html += '<div class="toolbar" data-sheet-panel="' + idx + '">';
+          html += '<button type="button" class="btn expand-all">一键展开</button>';
+          html += '<button type="button" class="btn collapse-all">一键折叠</button>';
+          html += '</div>';
+          let sheetTotal = 0;
+          sheet.groups.forEach(function(g) { sheetTotal += g.totalAmount != null ? g.totalAmount : 0; });
+          html += '<div class="sheet-total">所有套餐合计金额：¥' + formatMoney(sheetTotal) + '</div>';
+          sheet.groups.forEach(function(g, gi) {
+            const rows = g.rows || [];
+            const blockId = 'pkg-' + idx + '-' + gi;
+            const amount = g.totalAmount != null ? g.totalAmount : 0;
+            const amountCol = typeof g.amountCol === 'number' ? g.amountCol : findActualConsumptionCol(rows);
+            const isOtherPackage = (g.packageName || '').trim() === '其他套餐';
+
+            if (isOtherPackage && rows.length > 0) {
+              const productGroups = groupOtherPackageByProductName(rows, amountCol);
+              let accessCount = 0;
+              rows.forEach(function(r) {
+                const fc = (r[0] != null ? String(r[0]) : '').trim();
+                if ((fc.includes('：') || fc.includes(':')) && fc !== '小计' && !fc.startsWith('合计')) accessCount++;
+              });
+              html += '<div class="package-block">';
+              html += '<div class="package-header collapsed" data-toggle="' + blockId + '" role="button" aria-expanded="false">';
+              html += '<span class="chevron">&#9660;</span>';
+              html += '<span class="package-title-text">其他套餐</span>';
+              html += '<span class="amount">¥' + formatMoney(amount) + '</span>';
+              html += '<span class="count">' + accessCount + ' 个接入号</span>';
+              html += '</div>';
+              html += '<div class="package-body collapsed" id="' + blockId + '">';
+              productGroups.forEach(function(pg, pgi) {
+                const subId = blockId + '-pn-' + pgi;
+                let subCount = 0;
+                (pg.rows || []).forEach(function(r) {
+                  const fc = (r[0] != null ? String(r[0]) : '').trim();
+                  if ((fc.includes('：') || fc.includes(':')) && fc !== '小计' && !fc.startsWith('合计')) subCount++;
+                });
+                html += '<div class="package-block other-pkg-product">';
+                html += '<div class="package-header collapsed" data-toggle="' + subId + '" role="button" aria-expanded="false">';
+                html += '<span class="chevron">&#9660;</span>';
+                html += '<span class="package-title-text">' + escapeHtml(pg.productName) + '</span>';
+                html += '<span class="amount">¥' + formatMoney(pg.totalAmount) + '</span>';
+                html += '<span class="count">' + subCount + ' 个接入号</span>';
+                html += '</div>';
+                html += '<div class="package-body collapsed" id="' + subId + '">';
+                html += '<div class="table-wrap"><table><tbody>';
+                html += buildPackageRows(pg.rows, subId, '', amountCol);
+                html += '</tbody></table></div></div></div>';
+              });
+              html += '</div></div>';
+            } else {
+              let accessCount = 0;
+              rows.forEach(function(r) {
+                const fc = (r[0] != null ? String(r[0]) : '').trim();
+                if ((fc.includes('：') || fc.includes(':')) && fc !== '小计' && !fc.startsWith('合计')) accessCount++;
+              });
+              html += '<div class="package-block">';
+              html += '<div class="package-header collapsed" data-toggle="' + blockId + '" role="button" aria-expanded="false">';
+              html += '<span class="chevron">&#9660;</span>';
+              html += '<span class="package-title-text">' + escapeHtml(g.packageName || '未命名套餐') + '</span>';
+              html += '<span class="amount">¥' + formatMoney(amount) + '</span>';
+              html += '<span class="count">' + accessCount + ' 个接入号</span>';
+              html += '</div>';
+              html += '<div class="package-body collapsed" id="' + blockId + '">';
+              html += '<div class="table-wrap"><table><tbody>';
+              html += buildPackageRows(rows, blockId, g.packageName || '', typeof g.amountCol === 'number' ? g.amountCol : null);
+              html += '</tbody></table></div></div></div>';
+            }
+          });
+        } else {
+          html += '<div class="table-wrap"><table><thead><tr>';
+          const row0 = (sheet.data && sheet.data[0]) || [];
+          row0.forEach(cell => { html += `<th>${escapeHtml(String(cell))}</th>`; });
+          html += '</tr></thead><tbody>';
+          (sheet.data || []).slice(1).forEach(row => {
+            html += '<tr>';
+            row.forEach(cell => { html += `<td>${escapeHtml(String(cell))}</td>`; });
+            html += '</tr>';
+          });
+          html += '</tbody></table></div>';
+        }
+        html += '</div>';
+      });
+
+      contentEl.innerHTML = html;
+
+      document.querySelectorAll('#sheetTabs button').forEach(btn => {
+        btn.onclick = () => {
+          document.querySelectorAll('#sheetTabs .tab').forEach(t => t.classList.remove('active'));
+          btn.classList.add('active');
+          const index = parseInt(btn.dataset.index, 10);
+          document.querySelectorAll('.sheet-panel').forEach((panel, i) => {
+            panel.style.display = i === index ? '' : 'none';
+          });
+        };
+      });
+
+      contentEl.querySelectorAll('.package-header').forEach(header => {
+        header.onclick = () => {
+          const id = header.getAttribute('data-toggle');
+          const body = id ? document.getElementById(id) : null;
+          if (body) {
+            body.classList.toggle('collapsed');
+            header.classList.toggle('collapsed', body.classList.contains('collapsed'));
+            header.setAttribute('aria-expanded', body.classList.contains('collapsed') ? 'false' : 'true');
+          }
+        };
+      });
+
+      contentEl.querySelectorAll('.toolbar .expand-all').forEach(btn => {
+        btn.onclick = () => {
+          const panel = btn.closest('.sheet-panel');
+          if (panel) {
+            panel.querySelectorAll('.package-body').forEach(b => b.classList.remove('collapsed'));
+            panel.querySelectorAll('.package-header').forEach(h => h.classList.remove('collapsed'));
+            panel.querySelectorAll('.package-header').forEach(h => h.setAttribute('aria-expanded', 'true'));
+          }
+        };
+      });
+      contentEl.querySelectorAll('.toolbar .collapse-all').forEach(btn => {
+        btn.onclick = () => {
+          const panel = btn.closest('.sheet-panel');
+          if (panel) {
+            panel.querySelectorAll('.package-body').forEach(b => b.classList.add('collapsed'));
+            panel.querySelectorAll('.package-header').forEach(h => h.classList.add('collapsed'));
+            panel.querySelectorAll('.package-header').forEach(h => h.setAttribute('aria-expanded', 'false'));
+          }
+        };
+      });
+
+      // 为「产品：接入号」汇总行绑定折叠事件（只替换首字符 ▶/▼，保留金额的 span 样式）
+      contentEl.querySelectorAll('tr.product-summary').forEach(tr => {
+        tr.onclick = (e) => {
+          if (e.target && e.target.classList && e.target.classList.contains('btn-copy-access')) return;
+          const gid = tr.getAttribute('data-toggle');
+          if (!gid) return;
+          const details = contentEl.querySelectorAll('tr.product-detail[data-group="' + gid + '"]');
+          if (!details.length) return;
+          const firstCell = tr.querySelector('td');
+          let expanded = false;
+          details.forEach(d => {
+            if (d.style.display === 'none') {
+              d.style.display = '';
+              expanded = true;
+            } else {
+              d.style.display = 'none';
+            }
+          });
+          if (firstCell && firstCell.firstChild) {
+            const first = firstCell.firstChild;
+            if (first.nodeType === Node.TEXT_NODE) {
+              const t = first.textContent || '';
+              first.textContent = expanded ? t.replace(/^▶\s*/, '▼ ') : t.replace(/^▼\s*/, '▶ ');
+            }
+          }
+        };
+      });
+      contentEl.querySelectorAll('.btn-copy-access').forEach(btn => {
+        btn.onclick = (e) => {
+          e.stopPropagation();
+          const t = btn.getAttribute('data-copy') || '';
+          if (!t) return;
+          navigator.clipboard.writeText(t).then(() => {
+            const old = btn.textContent;
+            btn.textContent = '已复制';
+            setTimeout(() => { btn.textContent = old; }, 800);
+          }).catch(() => {});
+        };
+      });
+    }
+
+    function formatMoney(n) {
+      if (typeof n !== 'number' || isNaN(n)) return '0.00';
+      const s = n.toFixed(2);
+      const parts = s.split('.');
+      parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+      return parts.join('.');
+    }
+    function escapeHtml(s) {
+      const div = document.createElement('div');
+      div.textContent = s;
+      return div.innerHTML;
+    }
+    function escapeAttr(s) {
+      return String(s).replace(/"/g, '&quot;');
+    }
+
+    // 简单的数字解析：去掉逗号，转换为浮点数，失败返回 null
+    function parseNumberSafe(value) {
+      if (value == null) return null;
+      const s = String(value).replace(/[,，\s]/g, '');
+      if (!s) return null;
+      const n = Number(s);
+      return Number.isFinite(n) ? n : null;
+    }
+
+    // 根据行索引找到该行所属的「接入号+小计/合计」块（用于搜索后保留产品名称：接入号及金额；其他套餐以合计行结尾）
+    function getAccessBlock(rows, rowIndex) {
+      const row = rows[rowIndex] || [];
+      const firstCell = (row[0] != null ? String(row[0]) : '').trim();
+      const isTotalRow = (fc) => fc === '小计' || fc === '合计' || (fc && fc.startsWith('合计'));
+      if (isTotalRow(firstCell)) {
+        for (let j = rowIndex - 1; j >= 0; j--) {
+          const fc = (rows[j][0] != null ? String(rows[j][0]) : '').trim();
+          if ((fc.includes('：') || fc.includes(':')) && fc !== '小计' && !fc.startsWith('合计'))
+            return { accessIdx: j, subtotalIdx: rowIndex };
+        }
+        return null;
+      }
+      if ((firstCell.includes('：') || firstCell.includes(':')) && firstCell !== '小计' && !firstCell.startsWith('合计')) {
+        for (let j = rowIndex + 1; j < rows.length; j++) {
+          const fc = (rows[j][0] != null ? String(rows[j][0]) : '').trim();
+          if (isTotalRow(fc)) return { accessIdx: rowIndex, subtotalIdx: j };
+          if ((fc.includes('：') || fc.includes(':')) && !fc.startsWith('合计')) break;
+        }
+        return null;
+      }
+      for (let j = rowIndex - 1; j >= 0; j--) {
+        const fc = (rows[j][0] != null ? String(rows[j][0]) : '').trim();
+        if ((fc.includes('：') || fc.includes(':')) && fc !== '小计' && !fc.startsWith('合计')) {
+          for (let k = j + 1; k < rows.length; k++) {
+            const fk = (rows[k][0] != null ? String(rows[k][0]) : '').trim();
+            if (isTotalRow(fk)) return { accessIdx: j, subtotalIdx: k };
+            if ((fk.includes('：') || fk.includes(':')) && !fk.startsWith('合计')) break;
+          }
+          break;
+        }
+      }
+      return null;
+    }
+
+    // 搜索逻辑说明：
+    // 1) 有关键字时：对每个套餐块逐行检查，任意单元格（含表头、费用项、小计等）只要包含关键字（不区分大小写），
+    //    就保留该行所属的「产品名称：接入号」行和「小计」行，用于展示接入号及金额；其他行不展示。
+    // 2) 若没有任何单元格包含该关键字，则过滤后没有任何套餐块有内容，会显示「未找到相关信息」。
+    // 3) 因此若仍看到很多内容，说明文件中确有该关键词（可能在费用项、编码等列），当前仅列出「含该词的接入号」。
+    function filterReadDataByKeyword(readData, keyword) {
+      if (!keyword) return readData;
+      const kw = keyword.toLowerCase();
+      const clone = { ...readData };
+      clone.sheets = (readData.sheets || []).map(sheet => {
+        const newSheet = { ...sheet };
+        if (sheet.groups && sheet.groups.length) {
+          const filteredGroups = [];
+          sheet.groups.forEach(g => {
+            const rows = g.rows || [];
+            let amountCol = typeof g.amountCol === 'number' ? g.amountCol : null;
+            const packageName = g.packageName != null ? String(g.packageName) : '';
+            const pkgNameTrim = (packageName || '').trim();
+            if (pkgNameTrim && pkgNameTrim.toLowerCase().includes(kw)) return;
+
+            const indicesToKeep = new Set();
+            rows.forEach((row, idx) => {
+              const r = row || [];
+              const firstCell = (r[0] != null ? String(r[0]) : '').trim();
+              if (pkgNameTrim && firstCell === pkgNameTrim) return;
+              const matched = r.some(cell => cell != null && String(cell).toLowerCase().includes(kw));
+              if (matched) {
+                const block = getAccessBlock(rows, idx);
+                if (block) {
+                  for (let i = block.accessIdx; i <= block.subtotalIdx; i++) indicesToKeep.add(i);
+                }
+              }
+            });
+
+            const sortedIndices = Array.from(indicesToKeep).sort((a, b) => a - b);
+            const keptRows = sortedIndices.map(i => rows[i]);
+            if (amountCol == null) amountCol = findActualConsumptionCol(rows) || findActualConsumptionCol(keptRows);
+            let newTotal = 0;
+            keptRows.forEach((r) => {
+              const arr = r || [];
+              const fc = (arr[0] != null && String(arr[0]).trim()) || '';
+              const isAmountRow = fc === '小计' || fc === '合计' || fc.startsWith('合计') ||
+                arr.some(cell => { const s = String(cell != null ? cell : '').trim(); return s === '小计' || s === '合计' || s.startsWith('合计'); });
+              if (!isAmountRow) return;
+              let n = null;
+              if (amountCol != null && amountCol < arr.length) n = parseNumberSafe(arr[amountCol]);
+              if (n == null && arr.length > 0) n = parseNumberSafe(arr[arr.length - 1]);
+              if (n != null) newTotal += n;
+            });
+
+            if (keptRows.length > 0) {
+              filteredGroups.push({
+                ...g,
+                rows: keptRows,
+                totalAmount: newTotal
+              });
+            }
+          });
+          newSheet.groups = filteredGroups;
+          newSheet.data = undefined;
+        } else if (sheet.data && sheet.data.length) {
+          const data = sheet.data;
+          const header = data[0];
+          const body = data.slice(1);
+          const filteredRows = body.filter(row => {
+            return row.some(cell => cell != null && String(cell).toLowerCase().includes(kw));
+          });
+          newSheet.data = [header, ...filteredRows];
+        }
+        return newSheet;
+      });
+      return clone;
+    }
+
+    // 将「其他套餐」的 rows 按接入号冒号前的产品名称分组，返回 [{ productName, rows, totalAmount }, ...]
+    function groupOtherPackageByProductName(rows, amountCol) {
+      const n = (rows || []).length;
+      const groups = {};
+      let i = 0;
+      while (i < n) {
+        const row = rows[i] || [];
+        const fc = (row[0] != null ? String(row[0]) : '').trim();
+        if (!(fc.includes('：') || fc.includes(':')) || fc === '小计' || fc.startsWith('合计')) {
+          i++;
+          continue;
+        }
+        let productName = fc;
+        const colonIdx = Math.min(
+          fc.indexOf('：') >= 0 ? fc.indexOf('：') : fc.length,
+          fc.indexOf(':') >= 0 ? fc.indexOf(':') : fc.length
+        );
+        if (colonIdx < fc.length) productName = fc.slice(0, colonIdx).trim() || fc;
+        let endIdx = -1;
+        for (let j = i + 1; j < n; j++) {
+          const fj = (rows[j][0] != null ? String(rows[j][0]) : '').trim();
+          if (fj === '小计' || fj === '合计' || fj.startsWith('合计')) {
+            endIdx = j;
+            break;
+          }
+          if ((fj.includes('：') || fj.includes(':')) && !fj.startsWith('合计')) break;
+        }
+        if (endIdx === -1) {
+          i++;
+          continue;
+        }
+        const blockRows = rows.slice(i, endIdx + 1);
+        let blockAmount = 0;
+        const totalRow = rows[endIdx] || [];
+        if (amountCol != null && amountCol < totalRow.length) {
+          const v = parseNumberSafe(totalRow[amountCol]);
+          if (v != null) blockAmount = v;
+        } else if (totalRow.length > 0) {
+          const v = parseNumberSafe(totalRow[totalRow.length - 1]);
+          if (v != null) blockAmount = v;
+        }
+        if (!groups[productName]) groups[productName] = { productName: productName, rows: [], totalAmount: 0 };
+        groups[productName].rows.push.apply(groups[productName].rows, blockRows);
+        groups[productName].totalAmount += blockAmount;
+        i = endIdx + 1;
+      }
+      return Object.keys(groups).map(function(k) {
+        return { productName: groups[k].productName, rows: groups[k].rows, totalAmount: groups[k].totalAmount };
+      });
+    }
+
+    // 在套餐的 rows 中查找「实际消费」列索引：遍历所有行，找到某行某列包含「实际消费」「实收」「实付」即返回列索引
+    function findActualConsumptionCol(rows) {
+      const keywords = ['实际消费', '实收', '实付'];
+      for (let r = 0; r < (rows || []).length; r++) {
+        const row = rows[r] || [];
+        for (let c = 0; c < row.length; c++) {
+          const s = String(row[c] != null ? row[c] : '').trim();
+          if (keywords.some(kw => s.indexOf(kw) !== -1)) return c;
+        }
+      }
+      return null;
+    }
+
+    // 在每个套餐内部，按「产品名称：接入号」折叠明细；支持以「小计」或「合计」结束（其他套餐用合计行实际消费）。
+    // 规则：接入号行可点击展开/收起其下方明细（套餐及固定费、原价/减免/实际消费、小计/合计）；金额取该块结尾行（小计或合计）的实际消费列。
+    function buildPackageRows(rows, blockId, packageName, amountColFromBackend) {
+      let html = '';
+      let i = 0;
+      let productSeq = 0;
+      const n = rows.length;
+      const maxCols = n > 0 ? Math.max(...rows.map(r => (r || []).length)) : 0;
+      const amountCol = (typeof amountColFromBackend === 'number' && amountColFromBackend >= 0)
+        ? amountColFromBackend
+        : findActualConsumptionCol(rows);
+      const pad = (arr, len) => {
+        const a = arr || [];
+        while (a.length < len) a.push('');
+        return a;
+      };
+      const cellHtml = (val) => '<td>' + escapeHtml(String(val != null ? val : '')) + '</td>';
+
+      while (i < n) {
+        const row = rows[i] || [];
+        const firstCellRaw = row[0] != null ? String(row[0]) : '';
+        const firstCell = firstCellRaw.trim();
+
+        if (packageName && firstCell === String(packageName).trim()) {
+          i++;
+          continue;
+        }
+
+        if ((firstCell.includes('：') || firstCell.includes(':')) &&
+            firstCell !== '小计' &&
+            !firstCell.startsWith('合计')) {
+          const summaryRow = row;
+          let j = i + 1;
+          let endIdx = -1;
+          while (j < n) {
+            const fc = (rows[j][0] != null ? String(rows[j][0]) : '').trim();
+            if (fc === '小计' || fc === '合计' || fc.startsWith('合计')) {
+              endIdx = j;
+              break;
+            }
+            if ((fc.includes('：') || fc.includes(':')) && fc !== '小计' && !fc.startsWith('合计')) {
+              break;
+            }
+            j++;
+          }
+
+          if (endIdx !== -1) {
+            const groupId = blockId + '-prod-' + (productSeq++);
+            const totalRow = rows[endIdx] || [];
+            let amountVal = null;
+            if (amountCol != null && amountCol < totalRow.length) {
+              amountVal = parseNumberSafe(totalRow[amountCol]);
+            }
+            if (amountVal == null && amountCol == null) {
+              amountVal = parseNumberSafe(totalRow[totalRow.length - 1]);
+            }
+            const amountDisplay = amountVal != null ? '¥' + formatMoney(amountVal) : '';
+
+            // 接入号行（可点击展开）：第一格为 接入号 + 金额 + 复制按钮（复制仅冒号后的接入号）
+            const accessRaw = String(summaryRow[0] != null ? summaryRow[0] : '');
+            const accessText = escapeHtml(accessRaw);
+            let copyOnlyNumber = accessRaw;
+            const i1 = accessRaw.indexOf('：');
+            const i2 = accessRaw.indexOf(':');
+            const ci = (i1 >= 0 && i2 >= 0) ? Math.min(i1, i2) : (i1 >= 0 ? i1 : i2);
+            if (ci >= 0) copyOnlyNumber = accessRaw.slice(ci + 1).trim();
+            copyOnlyNumber = copyOnlyNumber.replace(/[（(][^）)]*[）)]/g, '').trim();
+            const cellContent = '▶ ' + accessText + (amountDisplay ? '  <span class="access-amount">' + escapeHtml(amountDisplay) + '</span>' : '') +
+              ' <button type="button" class="btn-copy-access" data-copy="' + escapeAttr(copyOnlyNumber) + '" title="复制接入号">复制</button>';
+            html += '<tr class="product-summary" data-toggle="' + groupId + '">';
+            html += '<td>' + cellContent + '</td>';
+            for (let c = 1; c < maxCols; c++) html += '<td></td>';
+            html += '</tr>';
+
+            // 详细费用行（默认折叠，点击接入号行展开/收起）
+            for (let k = i + 1; k <= endIdx; k++) {
+              const detailRow = rows[k] || [];
+              html += '<tr class="product-detail" data-group="' + groupId + '" style="display:none">';
+              pad([...detailRow], maxCols).forEach(cell => { html += cellHtml(cell); });
+              html += '</tr>';
+            }
+
+            i = endIdx + 1;
+            continue;
+          }
+        }
+
+        i++;
+      }
+
+      return html;
+    }
+
+    // 月度账单差异对比：渲染对比视图（下拉框 + 合计 + 对比表）
+    function renderMonthlyDiffView(data) {
+      const months = data.months || [];
+      const byMonth = data.byMonth || {};
+      if (months.length === 0) {
+        return '<div class="empty-state">未解析到有效月份，请确认表格含账单周期列（如 [20240701]2024-07-01:2024-07-31）。</div>';
+      }
+      let html = '<div class="monthly-diff-wrap">';
+      html += '<div class="toolbar" style="margin-bottom: 1rem;">';
+      html += '<label>选择月份一：</label>';
+      html += '<select id="monthSelectA" style="padding: 0.4rem 0.6rem; border-radius: 8px; border: 1px solid var(--border); background: var(--surface); color: var(--text); font-size: 0.9rem;">';
+      html += '<option value="">请选择</option>';
+      months.forEach(m => { html += '<option value="' + escapeAttr(m) + '">' + escapeHtml(m) + '</option>'; });
+      html += '</select>';
+      html += '<label style="margin-left: 1rem;">选择月份二：</label>';
+      html += '<select id="monthSelectB" style="padding: 0.4rem 0.6rem; border-radius: 8px; border: 1px solid var(--border); background: var(--surface); color: var(--text); font-size: 0.9rem;">';
+      html += '<option value="">请选择</option>';
+      months.forEach(m => { html += '<option value="' + escapeAttr(m) + '">' + escapeHtml(m) + '</option>'; });
+      html += '</select>';
+      html += '</div>';
+      html += '<div id="monthlyDiffTableWrap"></div>';
+      html += '</div>';
+      return html;
+    }
+
+    function buildMonthlyDiffTable(monthA, monthB, byMonth) {
+      if (!monthA || !monthB || !byMonth) return '';
+      const arrA = byMonth[monthA] || [];
+      const arrB = byMonth[monthB] || [];
+      const totalA = arrA.reduce((sum, item) => sum + (item.fee || 0), 0);
+      const totalB = arrB.reduce((sum, item) => sum + (item.fee || 0), 0);
+      const listA = arrA.reduce((acc, item) => { acc[item.number] = item.fee; return acc; }, {});
+      const listB = arrB.reduce((acc, item) => { acc[item.number] = item.fee; return acc; }, {});
+      const allNumbers = new Set([...Object.keys(listA), ...Object.keys(listB)]);
+      const rows = Array.from(allNumbers).sort().map(num => {
+        const feeA = listA[num] != null ? listA[num] : 0;
+        const feeB = listB[num] != null ? listB[num] : 0;
+        const diff = feeB - feeA;
+        let note = '';
+        if (feeA === 0 && feeB !== 0) note = '仅月份二有';
+        else if (feeA !== 0 && feeB === 0) note = '仅月份一有';
+        else note = '均有';
+        return { number: num, feeA, feeB, diff, note };
+      }).filter(r => r.diff !== 0).sort((a, b) => b.diff - a.diff);
+      let html = '<div class="monthly-diff-totals">';
+      html += '月份一（' + escapeHtml(monthA) + '）合计：¥' + formatMoney(totalA);
+      html += '　月份二（' + escapeHtml(monthB) + '）合计：¥' + formatMoney(totalB);
+      html += '</div>';
+      if (rows.length === 0) {
+        html += '<p class="empty-state" style="margin-top:1rem;">两月费用完全一致，无差异项。</p>';
+        return html;
+      }
+      html += '<div class="table-wrap"><table><thead><tr><th>号码</th><th>月份一（' + escapeHtml(monthA) + '）费用</th><th>月份二（' + escapeHtml(monthB) + '）费用</th><th>差异（二减一）</th><th>备注</th></tr></thead><tbody>';
+      rows.forEach(r => {
+        html += '<tr>';
+        html += '<td>' + escapeHtml(r.number) + '</td>';
+        html += '<td class="access-amount">¥' + formatMoney(r.feeA) + '</td>';
+        html += '<td class="access-amount">¥' + formatMoney(r.feeB) + '</td>';
+        const diffClass = r.diff > 0 ? 'diff-up' : (r.diff < 0 ? 'diff-down' : '');
+        html += '<td class="' + diffClass + '">' + (r.diff >= 0 ? '+' : '') + formatMoney(r.diff) + '</td>';
+        html += '<td>' + escapeHtml(r.note) + '</td>';
+        html += '</tr>';
+      });
+      html += '</tbody></table></div>';
+      return html;
+    }
+
+    function showMonthlyDiffTable() {
+      const wrap = document.getElementById('monthlyDiffTableWrap');
+      if (!wrap || !lastMonthlyDiffData) return;
+      const monthA = document.getElementById('monthSelectA') && document.getElementById('monthSelectA').value;
+      const monthB = document.getElementById('monthSelectB') && document.getElementById('monthSelectB').value;
+      if (monthA && monthB) {
+        wrap.innerHTML = buildMonthlyDiffTable(monthA, monthB, lastMonthlyDiffData.byMonth);
+      } else {
+        wrap.innerHTML = '<p class="empty-state" style="margin-top:1rem;">请同时选择「月份一」和「月份二」查看对比结果。</p>';
+      }
+    }
+
+    uploadBtn.onclick = () => uploadInput.click();
+    uploadInput.onchange = async () => {
+      const file = uploadInput.files[0];
+      if (!file) return;
+      contentEl.innerHTML = '<div class="loading">正在上传并分析…</div>';
+      mainTitleEl.textContent = '套餐详情分析';
+      searchBarEl.style.display = '';
+      const formData = new FormData();
+      formData.append('file', file);
+      try {
+        const res = await fetch('/api/upload', {
+          method: 'POST',
+          body: formData
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok || data.error) {
+          contentEl.innerHTML = `<div class="error-msg">${escapeHtml(data.error || '上传或分析失败')}</div>`;
+          return;
+        }
+        lastMonthlyDiffData = null;
+        lastReadData = data.read;
+        renderResult(data.read, data.analyze || null);
+      } catch (e) {
+        contentEl.innerHTML = `<div class="error-msg">上传失败：${escapeHtml(String(e.message))}</div>`;
+      } finally {
+        uploadInput.value = '';
+      }
+    };
+
+    uploadMonthlyDiffBtn.onclick = () => uploadMonthlyDiffInput.click();
+    uploadMonthlyDiffInput.onchange = async () => {
+      const file = uploadMonthlyDiffInput.files[0];
+      if (!file) return;
+      contentEl.innerHTML = '<div class="loading">正在解析账单周期与费用…</div>';
+      mainTitleEl.textContent = '月度账单差异对比';
+      searchBarEl.style.display = 'none';
+      const formData = new FormData();
+      formData.append('file', file);
+      try {
+        const res = await fetch('/api/upload_monthly_diff', { method: 'POST', body: formData });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok || data.error) {
+          contentEl.innerHTML = `<div class="error-msg">${escapeHtml(data.error || '上传或解析失败')}</div>`;
+          return;
+        }
+        lastReadData = null;
+        lastMonthlyDiffData = { months: data.months || [], byMonth: data.byMonth || {} };
+        contentEl.innerHTML = renderMonthlyDiffView(lastMonthlyDiffData);
+        const selA = document.getElementById('monthSelectA');
+        const selB = document.getElementById('monthSelectB');
+        if (selA) selA.onchange = showMonthlyDiffTable;
+        if (selB) selB.onchange = showMonthlyDiffTable;
+        showMonthlyDiffTable();
+      } catch (e) {
+        contentEl.innerHTML = `<div class="error-msg">上传失败：${escapeHtml(String(e.message))}</div>`;
+      } finally {
+        uploadMonthlyDiffInput.value = '';
+      }
+    };
+
+    // 搜索事件：根据关键字过滤当前结果；无结果时只显示明确提示，不展示无关内容
+    function applySearch() {
+      if (!lastReadData) {
+        contentEl.innerHTML = '<div class="error-msg">请先上传套餐文件，再使用搜索功能。</div>';
+        return;
+      }
+      const kw = (searchInput.value || '').trim();
+      if (!kw) {
+        renderResult(lastReadData, null);
+        return;
+      }
+      const filtered = filterReadDataByKeyword(lastReadData, kw);
+      var totalRows = (filtered.sheets || []).reduce(function (sum, s) {
+        return sum + (s.groups || []).reduce(function (s2, g) { return s2 + (g.rows || []).length; }, 0);
+      }, 0);
+      var hasDataRows = (filtered.sheets || []).some(function (s) {
+        var data = s.data || [];
+        return data.length > 1;
+      });
+      if (totalRows === 0 && !hasDataRows) {
+        contentEl.innerHTML = '<div class="empty-state">未找到相关信息。</div>';
+        return;
+      }
+      renderResult(filtered, null, kw);
+    }
+
+    searchBtn.onclick = applySearch;
+    clearSearchBtn.onclick = () => {
+      if (!lastReadData) {
+        contentEl.innerHTML = '<div class="error-msg">当前没有可清空的搜索结果。</div>';
+        return;
+      }
+      searchInput.value = '';
+      renderResult(lastReadData, null);
+    };
+    searchInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        applySearch();
+      }
+    });
+
+  </script>
+</body>
+</html>
